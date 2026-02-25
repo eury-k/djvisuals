@@ -1,76 +1,50 @@
-"use client";
+// Magic UI — Retro Grid background
+// Source: https://magicui.design/docs/components/retro-grid
+// Dependency: clsx + tailwind-merge (via @/lib/utils)
 
-// Magic UI Retro Grid — CSS-based, no WebGL conflict with Spline
+import { cn } from "@/lib/utils";
 
-interface RetroGridProps {
-  style?: React.CSSProperties;
+interface RetroGridProps extends React.HTMLAttributes<HTMLDivElement> {
   className?: string;
-  speed?: number; // seconds per scroll cycle
-  color?: string;
+  angle?: number;
+  cellSize?: number;
+  opacity?: number;
+  lineColor?: string;
 }
 
-export default function RetroGrid({
-  style,
+export function RetroGrid({
   className,
-  speed = 8,
-  color = "#00ff88",
+  angle = 65,
+  cellSize = 60,
+  opacity = 0.5,
+  lineColor = "#00ff88",
+  ...props
 }: RetroGridProps) {
+  const gridStyles = {
+    "--grid-angle": `${angle}deg`,
+    "--cell-size": `${cellSize}px`,
+    "--opacity": opacity,
+    "--light-line": lineColor,
+    "--dark-line": lineColor,
+  } as React.CSSProperties;
+
   return (
     <div
-      className={className}
-      style={{
-        width: "100%",
-        height: "100%",
-        background: "#000",
-        overflow: "hidden",
-        perspective: "400px",
-        ...style,
-      }}
+      className={cn(
+        "pointer-events-none absolute size-full overflow-hidden [perspective:200px]",
+        `opacity-[var(--opacity)]`,
+        className
+      )}
+      style={gridStyles}
+      {...props}
     >
-      <style>{`
-        @keyframes retro-scroll {
-          from { backgroundPositionY: 0px; }
-          to { backgroundPositionY: 80px; }
-        }
-      `}</style>
-      <div
-        style={{
-          width: "100%",
-          height: "150%",
-          backgroundImage: `
-            linear-gradient(${color}33 1px, transparent 1px),
-            linear-gradient(90deg, ${color}33 1px, transparent 1px)
-          `,
-          backgroundSize: "80px 80px",
-          transform: "rotateX(45deg)",
-          transformOrigin: "top center",
-          animation: `retro-scroll ${speed}s linear infinite`,
-        }}
-      />
-      {/* Horizon fade */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: "50%",
-          background: "linear-gradient(to bottom, #000 0%, transparent 100%)",
-        }}
-      />
-      {/* Glow line at horizon */}
-      <div
-        style={{
-          position: "absolute",
-          top: "50%",
-          left: 0,
-          right: 0,
-          height: "2px",
-          background: color,
-          boxShadow: `0 0 20px 4px ${color}`,
-          opacity: 0.7,
-        }}
-      />
+      <div className="absolute inset-0 [transform:rotateX(var(--grid-angle))]">
+        <div className="animate-grid [inset:0%_0px] [margin-left:-200%] [height:300vh] [width:600vw] [transform-origin:100%_0_0] [background-image:linear-gradient(to_right,var(--dark-line)_1px,transparent_0),linear-gradient(to_bottom,var(--dark-line)_1px,transparent_0)] [background-size:var(--cell-size)_var(--cell-size)] [background-repeat:repeat]" />
+      </div>
+      {/* Horizon fade — always dark for DJ visual context */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent to-90%" />
     </div>
   );
 }
+
+export default RetroGrid;

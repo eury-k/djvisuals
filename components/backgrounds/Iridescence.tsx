@@ -1,121 +1,160 @@
 "use client";
 
+// ReactBits — Iridescence background
+// Source: https://reactbits.dev/backgrounds/iridescence
+// Dependency: ogl
+
+import { Renderer, Program, Mesh, Color, Triangle } from "ogl";
 import { useEffect, useRef } from "react";
 
-// ReactBits Iridescence background
-// Source: https://reactbits.dev/backgrounds/iridescence
+const vertexShader = `
+attribute vec2 uv;
+attribute vec2 position;
+
+varying vec2 vUv;
+
+void main() {
+  vUv = uv;
+  gl_Position = vec4(position, 0, 1);
+}
+`;
+
+const fragmentShader = `
+precision highp float;
+
+uniform float uTime;
+uniform vec3 uColor;
+uniform vec3 uResolution;
+uniform vec2 uMouse;
+uniform float uAmplitude;
+uniform float uSpeed;
+
+varying vec2 vUv;
+
+void main() {
+  float mr = min(uResolution.x, uResolution.y);
+  vec2 uv = (vUv.xy * 2.0 - 1.0) * uResolution.xy / mr;
+
+  uv += (uMouse - vec2(0.5)) * uAmplitude;
+
+  float d = -uTime * 0.5 * uSpeed;
+  float a = 0.0;
+  for (float i = 0.0; i < 8.0; ++i) {
+    a += cos(i - d - a * uv.x);
+    d += sin(uv.y * i + a);
+  }
+  d += uTime * 0.5 * uSpeed;
+  vec3 col = vec3(cos(uv * vec2(d, a)) * 0.6 + 0.4, cos(a + d) * 0.5 + 0.5);
+  col = cos(col * cos(vec3(d, a, 2.5)) * 0.5 + 0.5) * uColor;
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
 
 interface IridescenceProps {
   color?: [number, number, number];
   speed?: number;
   amplitude?: number;
+  mouseReact?: boolean;
   style?: React.CSSProperties;
   className?: string;
 }
 
-const VERT = `
-  attribute vec2 position;
-  void main() {
-    gl_Position = vec4(position, 0.0, 1.0);
-  }
-`;
-
-const FRAG = `
-  precision mediump float;
-  uniform float u_time;
-  uniform vec2 u_resolution;
-  uniform vec3 u_color;
-  uniform float u_amplitude;
-
-  void main() {
-    vec2 uv = gl_FragCoord.xy / u_resolution;
-    float t = u_time * 0.4;
-
-    float r = 0.5 + 0.5 * sin(uv.x * 3.0 + t + 0.0) * u_amplitude;
-    float g = 0.5 + 0.5 * sin(uv.x * 3.0 + t + 2.094) * u_amplitude;
-    float b = 0.5 + 0.5 * sin(uv.x * 3.0 + t + 4.188) * u_amplitude;
-
-    float wave = sin(uv.y * 6.0 + uv.x * 4.0 + t * 1.5) * 0.15;
-    r += wave * u_color.r;
-    g += wave * u_color.g;
-    b += wave * u_color.b;
-
-    gl_FragColor = vec4(r, g, b, 1.0);
-  }
-`;
-
 export default function Iridescence({
   color = [1, 1, 1],
-  speed = 1,
-  amplitude = 1,
+  speed = 1.0,
+  amplitude = 0.1,
+  mouseReact = false,
   style,
   className,
+  ...rest
 }: IridescenceProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const ctnDom = useRef<HTMLDivElement>(null);
+  const mousePos = useRef({ x: 0.5, y: 0.5 });
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!ctnDom.current) return;
+    const ctn = ctnDom.current;
+    const renderer = new Renderer();
+    const gl = renderer.gl;
+    gl.clearColor(1, 1, 1, 1);
 
-    const gl = canvas.getContext("webgl");
-    if (!gl) return;
+    let program: Program;
 
-    const compileShader = (type: number, src: string) => {
-      const shader = gl.createShader(type)!;
-      gl.shaderSource(shader, src);
-      gl.compileShader(shader);
-      return shader;
+    function resize() {
+      renderer.setSize(ctn.offsetWidth, ctn.offsetHeight);
+      if (program) {
+        program.uniforms.uResolution.value = new Color(
+          gl.canvas.width,
+          gl.canvas.height,
+          gl.canvas.width / gl.canvas.height
+        );
+      }
+    }
+    window.addEventListener("resize", resize, false);
+    resize();
+
+    const geometry = new Triangle(gl);
+    program = new Program(gl, {
+      vertex: vertexShader,
+      fragment: fragmentShader,
+      uniforms: {
+        uTime: { value: 0 },
+        uColor: { value: new Color(...color) },
+        uResolution: {
+          value: new Color(
+            gl.canvas.width,
+            gl.canvas.height,
+            gl.canvas.width / gl.canvas.height
+          ),
+        },
+        uMouse: {
+          value: new Float32Array([mousePos.current.x, mousePos.current.y]),
+        },
+        uAmplitude: { value: amplitude },
+        uSpeed: { value: speed },
+      },
+    });
+
+    const mesh = new Mesh(gl, { geometry, program });
+    let animateId: number;
+
+    function update(t: number) {
+      animateId = requestAnimationFrame(update);
+      program.uniforms.uTime.value = t * 0.001;
+      renderer.render({ scene: mesh });
+    }
+    animateId = requestAnimationFrame(update);
+    ctn.appendChild(gl.canvas);
+
+    function handleMouseMove(e: MouseEvent) {
+      const rect = ctn.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width;
+      const y = 1.0 - (e.clientY - rect.top) / rect.height;
+      mousePos.current = { x, y };
+      program.uniforms.uMouse.value[0] = x;
+      program.uniforms.uMouse.value[1] = y;
+    }
+    if (mouseReact) {
+      ctn.addEventListener("mousemove", handleMouseMove);
+    }
+
+    return () => {
+      cancelAnimationFrame(animateId);
+      window.removeEventListener("resize", resize);
+      if (mouseReact) {
+        ctn.removeEventListener("mousemove", handleMouseMove);
+      }
+      if (gl.canvas.parentNode === ctn) ctn.removeChild(gl.canvas);
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
-
-    const program = gl.createProgram()!;
-    gl.attachShader(program, compileShader(gl.VERTEX_SHADER, VERT));
-    gl.attachShader(program, compileShader(gl.FRAGMENT_SHADER, FRAG));
-    gl.linkProgram(program);
-    gl.useProgram(program);
-
-    const positions = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
-
-    const posLoc = gl.getAttribLocation(program, "position");
-    gl.enableVertexAttribArray(posLoc);
-    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-
-    const uTime = gl.getUniformLocation(program, "u_time");
-    const uRes = gl.getUniformLocation(program, "u_resolution");
-    const uColor = gl.getUniformLocation(program, "u_color");
-    const uAmp = gl.getUniformLocation(program, "u_amplitude");
-
-    let raf: number;
-    let start = performance.now();
-
-    const resize = () => {
-      canvas.width = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-      gl.viewport(0, 0, canvas.width, canvas.height);
-    };
-
-    const render = () => {
-      const elapsed = ((performance.now() - start) / 1000) * speed;
-      resize();
-      gl.uniform1f(uTime, elapsed);
-      gl.uniform2f(uRes, canvas.width, canvas.height);
-      gl.uniform3fv(uColor, color);
-      gl.uniform1f(uAmp, amplitude);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      raf = requestAnimationFrame(render);
-    };
-
-    render();
-    return () => cancelAnimationFrame(raf);
-  }, [color, speed, amplitude]);
+  }, [color, speed, amplitude, mouseReact]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className={className}
-      style={{ display: "block", width: "100%", height: "100%", ...style }}
+    <div
+      ref={ctnDom}
+      className={`iridescence-container ${className ?? ""}`}
+      style={style}
+      {...rest}
     />
   );
 }
