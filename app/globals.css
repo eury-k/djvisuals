@@ -15,18 +15,10 @@ body {
   color: #fff;
 }
 
-/* Magic UI: RetroGrid animation */
-@keyframes grid {
-  0% { transform: translateY(-50%); }
+/* RetroGrid scroll animation */
+@keyframes retro-grid-scroll {
+  0%   { transform: translateY(-50%); }
   100% { transform: translateY(0); }
-}
-
-@theme inline {
-  --animate-grid: grid 15s linear infinite;
-}
-
-.animate-grid {
-  animation: var(--animate-grid);
 }
 
 /* ReactBits shared container */

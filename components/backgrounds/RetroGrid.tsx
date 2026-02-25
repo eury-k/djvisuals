@@ -1,50 +1,91 @@
-// Magic UI — Retro Grid background
+"use client";
+
+// Magic UI — Retro Grid background (inline CSS, no Tailwind arbitrary values)
 // Source: https://magicui.design/docs/components/retro-grid
-// Dependency: clsx + tailwind-merge (via @/lib/utils)
 
-import { cn } from "@/lib/utils";
+import { useEffect, useRef } from "react";
 
-interface RetroGridProps extends React.HTMLAttributes<HTMLDivElement> {
-  className?: string;
+interface RetroGridProps {
   angle?: number;
   cellSize?: number;
   opacity?: number;
   lineColor?: string;
+  speed?: number; // animation duration in seconds
+  style?: React.CSSProperties;
+  className?: string;
 }
 
-export function RetroGrid({
-  className,
+export default function RetroGrid({
   angle = 65,
   cellSize = 60,
-  opacity = 0.5,
+  opacity = 0.6,
   lineColor = "#00ff88",
-  ...props
+  speed = 15,
+  style,
+  className,
 }: RetroGridProps) {
-  const gridStyles = {
-    "--grid-angle": `${angle}deg`,
-    "--cell-size": `${cellSize}px`,
-    "--opacity": opacity,
-    "--light-line": lineColor,
-    "--dark-line": lineColor,
-  } as React.CSSProperties;
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  // Update animation duration when speed changes
+  useEffect(() => {
+    if (gridRef.current) {
+      gridRef.current.style.animationDuration = `${speed}s`;
+    }
+  }, [speed]);
 
   return (
     <div
-      className={cn(
-        "pointer-events-none absolute size-full overflow-hidden [perspective:200px]",
-        `opacity-[var(--opacity)]`,
-        className
-      )}
-      style={gridStyles}
-      {...props}
+      className={className}
+      style={{
+        position: "absolute",
+        inset: 0,
+        overflow: "hidden",
+        perspective: "200px",
+        opacity,
+        ...style,
+      }}
     >
-      <div className="absolute inset-0 [transform:rotateX(var(--grid-angle))]">
-        <div className="animate-grid [inset:0%_0px] [margin-left:-200%] [height:300vh] [width:600vw] [transform-origin:100%_0_0] [background-image:linear-gradient(to_right,var(--dark-line)_1px,transparent_0),linear-gradient(to_bottom,var(--dark-line)_1px,transparent_0)] [background-size:var(--cell-size)_var(--cell-size)] [background-repeat:repeat]" />
+      {/* Grid plane */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          transform: `rotateX(${angle}deg)`,
+          transformOrigin: "top center",
+        }}
+      >
+        <div
+          ref={gridRef}
+          style={{
+            position: "absolute",
+            inset: "0px",
+            marginLeft: "-200%",
+            height: "300vh",
+            width: "600vw",
+            transformOrigin: "100% 0 0",
+            backgroundImage: `
+              linear-gradient(to right, ${lineColor} 1px, transparent 0),
+              linear-gradient(to bottom, ${lineColor} 1px, transparent 0)
+            `,
+            backgroundSize: `${cellSize}px ${cellSize}px`,
+            backgroundRepeat: "repeat",
+            animationName: "retro-grid-scroll",
+            animationDuration: `${speed}s`,
+            animationTimingFunction: "linear",
+            animationIterationCount: "infinite",
+          }}
+        />
       </div>
-      {/* Horizon fade — always dark for DJ visual context */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent to-90%" />
+
+      {/* Fade horizon to black */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "linear-gradient(to bottom, #000 0%, transparent 40%, transparent 60%, #000 100%)",
+          pointerEvents: "none",
+        }}
+      />
     </div>
   );
 }
-
-export default RetroGrid;
