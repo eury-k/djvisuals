@@ -12,10 +12,13 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+const DURATION_PRESETS = [5, 10, 15, 20, 25, 30];
+
 interface Clip {
   id: string;
   sceneId: string;
   duration: number; // seconds
+  reversed: boolean;
   params: BackgroundParams;
 }
 
@@ -30,6 +33,7 @@ const defaultClip = (sceneId = SCENES[0].id): Clip => {
     id: uid(),
     sceneId: scene.id,
     duration: 10,
+    reversed: false,
     params: { ...DEFAULT_PARAMS[scene.background as BackgroundId] },
   };
 };
@@ -66,96 +70,104 @@ function ClipRow({
       onClick={onSelect}
       style={{
         display: "flex",
-        alignItems: "center",
-        gap: "10px",
+        flexDirection: "column",
+        gap: "8px",
         padding: "10px 12px",
         background: isActive ? "#1a1a1a" : "transparent",
         border: `1px solid ${isActive ? "#333" : "transparent"}`,
         borderRadius: "8px",
         cursor: "pointer",
         transition: "all 0.1s",
+        marginBottom: "4px",
       }}
     >
-      {/* Index + color dot */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-        <span style={{ color: "#333", fontSize: "11px", width: "16px", textAlign: "right" }}>
+      {/* Row 1: index + scene + reverse + delete */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <span style={{ color: "#333", fontSize: "11px", width: "16px", textAlign: "right", flexShrink: 0 }}>
           {index + 1}
         </span>
         <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: color, flexShrink: 0 }} />
-      </div>
 
-      {/* Scene selector */}
-      <select
-        value={clip.sceneId}
-        onClick={(e) => e.stopPropagation()}
-        onChange={(e) => {
-          const scene = SCENES.find((s) => s.id === e.target.value)!;
-          onChange({
-            sceneId: scene.id,
-            params: { ...DEFAULT_PARAMS[scene.background as BackgroundId] },
-          });
-        }}
-        style={{
-          flex: 1,
-          background: "#111",
-          color: "#ccc",
-          border: "1px solid #2a2a2a",
-          borderRadius: "6px",
-          padding: "5px 8px",
-          fontSize: "12px",
-          fontFamily: "monospace",
-          cursor: "pointer",
-        }}
-      >
-        {SCENES.map((s) => (
-          <option key={s.id} value={s.id}>{s.label}</option>
-        ))}
-      </select>
-
-      {/* Duration */}
-      <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
-        <input
-          type="number"
-          min={1}
-          max={300}
-          value={clip.duration}
+        <select
+          value={clip.sceneId}
           onClick={(e) => e.stopPropagation()}
-          onChange={(e) => onChange({ duration: Math.max(1, parseInt(e.target.value) || 1) })}
+          onChange={(e) => {
+            const scene = SCENES.find((s) => s.id === e.target.value)!;
+            onChange({ sceneId: scene.id, params: { ...DEFAULT_PARAMS[scene.background as BackgroundId] } });
+          }}
           style={{
-            width: "48px",
+            flex: 1,
             background: "#111",
             color: "#ccc",
             border: "1px solid #2a2a2a",
             borderRadius: "6px",
-            padding: "5px 6px",
+            padding: "5px 8px",
             fontSize: "12px",
             fontFamily: "monospace",
-            textAlign: "center",
+            cursor: "pointer",
           }}
-        />
-        <span style={{ color: "#333", fontSize: "11px" }}>s</span>
+        >
+          {SCENES.map((s) => (
+            <option key={s.id} value={s.id}>{s.label}</option>
+          ))}
+        </select>
+
+        {/* Reverse toggle */}
+        <button
+          title={clip.reversed ? "Playing reversed — click for forward" : "Playing forward — click for reverse"}
+          onClick={(e) => { e.stopPropagation(); onChange({ reversed: !clip.reversed }); }}
+          style={{
+            background: clip.reversed ? "#2a1a4a" : "none",
+            border: `1px solid ${clip.reversed ? "#7c3aff" : "#2a2a2a"}`,
+            borderRadius: "6px",
+            color: clip.reversed ? "#a366ff" : "#444",
+            cursor: "pointer",
+            fontSize: "11px",
+            fontFamily: "monospace",
+            padding: "4px 7px",
+            flexShrink: 0,
+            transition: "all 0.15s",
+          }}
+        >
+          {clip.reversed ? "◀ REV" : "▶ FWD"}
+        </button>
+
+        {canRemove && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            style={{ background: "none", border: "none", color: "#333", cursor: "pointer", fontSize: "14px", padding: "0 2px", flexShrink: 0, lineHeight: 1 }}
+            onMouseEnter={(e) => ((e.target as HTMLElement).style.color = "#ff4444")}
+            onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "#333")}
+          >×</button>
+        )}
       </div>
 
-      {/* Delete */}
-      {canRemove && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onRemove(); }}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#333",
-            cursor: "pointer",
-            fontSize: "14px",
-            padding: "0 2px",
-            flexShrink: 0,
-            lineHeight: 1,
-          }}
-          onMouseEnter={(e) => ((e.target as HTMLElement).style.color = "#ff4444")}
-          onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "#333")}
-        >
-          ×
-        </button>
-      )}
+      {/* Row 2: duration presets */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ display: "flex", gap: "4px", paddingLeft: "24px" }}
+      >
+        {DURATION_PRESETS.map((s) => (
+          <button
+            key={s}
+            onClick={(e) => { e.stopPropagation(); onChange({ duration: s }); }}
+            style={{
+              flex: 1,
+              padding: "4px 0",
+              background: clip.duration === s ? "#fff" : "#111",
+              color: clip.duration === s ? "#000" : "#444",
+              border: `1px solid ${clip.duration === s ? "#fff" : "#1e1e1e"}`,
+              borderRadius: "5px",
+              fontSize: "10px",
+              fontFamily: "monospace",
+              cursor: "pointer",
+              transition: "all 0.1s",
+            }}
+          >
+            {s}s
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -338,7 +350,7 @@ export default function BuilderPage() {
           }}
         >
           <div style={{ width: "100vw", height: "100vh" }}>
-            <VisualStage scene={activeScene} params={activeClip.params} />
+            <VisualStage scene={activeScene} params={activeClip.params} reversed={activeClip.reversed} />
           </div>
 
           {/* HUD */}
@@ -545,7 +557,7 @@ export default function BuilderPage() {
                 flexShrink: 0,
               }}
             >
-              <VisualStage scene={activeScene} params={activeClip.params} />
+              <VisualStage scene={activeScene} params={activeClip.params} reversed={activeClip.reversed} />
             </div>
 
             {/* Preview playback controls */}

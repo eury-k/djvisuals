@@ -9,6 +9,7 @@ interface RetroGridProps {
   opacity?: number;
   lineColor?: string;
   speed?: number; // animation duration in seconds
+  reversed?: boolean;
   style?: React.CSSProperties;
   className?: string;
 }
@@ -19,6 +20,7 @@ export default function RetroGrid({
   opacity = 0.6,
   lineColor = "#00ff88",
   speed = 15,
+  reversed = false,
   style,
   className,
 }: RetroGridProps) {
@@ -60,6 +62,7 @@ export default function RetroGrid({
             animationDuration: `${speed}s`,
             animationTimingFunction: "linear",
             animationIterationCount: "infinite",
+            animationDirection: reversed ? "reverse" : "normal",
           }}
         />
       </div>

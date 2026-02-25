@@ -118,6 +118,7 @@ interface AuroraProps {
   amplitude?: number;
   blend?: number;
   speed?: number;
+  reversed?: boolean;
   style?: React.CSSProperties;
   className?: string;
 }
@@ -127,11 +128,12 @@ export default function Aurora({
   amplitude = 1.0,
   blend = 0.5,
   speed = 1.0,
+  reversed = false,
   style,
   className,
 }: AuroraProps) {
-  const propsRef = useRef<AuroraProps>({ colorStops, amplitude, blend, speed });
-  propsRef.current = { colorStops, amplitude, blend, speed };
+  const propsRef = useRef<AuroraProps>({ colorStops, amplitude, blend, speed, reversed });
+  propsRef.current = { colorStops, amplitude, blend, speed, reversed };
 
   const ctnDom = useRef<HTMLDivElement>(null);
 
@@ -189,11 +191,14 @@ export default function Aurora({
     ctn.appendChild(gl.canvas);
 
     let animateId = 0;
+    let startT = -1;
     const update = (t: number) => {
       animateId = requestAnimationFrame(update);
-      const { speed: s = 1.0 } = propsRef.current;
+      if (startT < 0) startT = t;
+      const elapsed = (t - startT) * 0.001;
+      const { speed: s = 1.0, reversed: rev = false } = propsRef.current;
       if (program) {
-        program.uniforms.uTime.value = t * 0.001 * s * 0.1;
+        program.uniforms.uTime.value = (rev ? -elapsed : elapsed) * s * 0.1;
         program.uniforms.uAmplitude.value = propsRef.current.amplitude ?? 1.0;
         program.uniforms.uBlend.value = propsRef.current.blend ?? 0.5;
         const stops = propsRef.current.colorStops ?? colorStops;

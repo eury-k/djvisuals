@@ -55,6 +55,7 @@ interface IridescenceProps {
   speed?: number;
   amplitude?: number;
   mouseReact?: boolean;
+  reversed?: boolean;
   style?: React.CSSProperties;
   className?: string;
 }
@@ -64,12 +65,15 @@ export default function Iridescence({
   speed = 1.0,
   amplitude = 0.1,
   mouseReact = false,
+  reversed = false,
   style,
   className,
   ...rest
 }: IridescenceProps) {
   const ctnDom = useRef<HTMLDivElement>(null);
   const mousePos = useRef({ x: 0.5, y: 0.5 });
+  const reversedRef = useRef(reversed);
+  reversedRef.current = reversed;
 
   useEffect(() => {
     if (!ctnDom.current) return;
@@ -122,10 +126,13 @@ export default function Iridescence({
 
     const mesh = new Mesh(gl, { geometry, program });
     let animateId: number;
+    let startT = -1;
 
     function update(t: number) {
       animateId = requestAnimationFrame(update);
-      program.uniforms.uTime.value = t * 0.001;
+      if (startT < 0) startT = t;
+      const elapsed = (t - startT) * 0.001;
+      program.uniforms.uTime.value = reversedRef.current ? -elapsed : elapsed;
       renderer.render({ scene: mesh });
     }
     animateId = requestAnimationFrame(update);
