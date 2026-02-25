@@ -1,9 +1,7 @@
 "use client";
 
-// Magic UI — Retro Grid background (inline CSS, no Tailwind arbitrary values)
+// Magic UI — Retro Grid background
 // Source: https://magicui.design/docs/components/retro-grid
-
-import { useEffect, useRef } from "react";
 
 interface RetroGridProps {
   angle?: number;
@@ -24,15 +22,6 @@ export default function RetroGrid({
   style,
   className,
 }: RetroGridProps) {
-  const gridRef = useRef<HTMLDivElement>(null);
-
-  // Update animation duration when speed changes
-  useEffect(() => {
-    if (gridRef.current) {
-      gridRef.current.style.animationDuration = `${speed}s`;
-    }
-  }, [speed]);
-
   return (
     <div
       className={className}
@@ -51,11 +40,9 @@ export default function RetroGrid({
           position: "absolute",
           inset: 0,
           transform: `rotateX(${angle}deg)`,
-          transformOrigin: "top center",
         }}
       >
         <div
-          ref={gridRef}
           style={{
             position: "absolute",
             inset: "0px",
@@ -77,12 +64,12 @@ export default function RetroGrid({
         />
       </div>
 
-      {/* Fade horizon to black */}
+      {/* Magic UI fade — black at bottom, transparent toward top (90%) */}
       <div
         style={{
           position: "absolute",
           inset: 0,
-          background: "linear-gradient(to bottom, #000 0%, transparent 40%, transparent 60%, #000 100%)",
+          background: "linear-gradient(to top, #000 0%, transparent 90%)",
           pointerEvents: "none",
         }}
       />
