@@ -1,25 +1,55 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { io, Socket } from "socket.io-client";
+import { useEffect, useState, useCallback } from "react";
 import VisualStage from "@/components/visuals/VisualStage";
-import { SCENES, Scene } from "@/components/visuals/scenes";
+import ControlPanel from "@/components/remote/ControlPanel";
+import { useScenes } from "@/components/remote/useScenes";
 
-let socket: Socket;
+type Mode = "edit" | "fullscreen";
 
 export default function DisplayPage() {
-  const [scene, setScene] = useState<Scene>(SCENES[0]);
+  const { scene, switchScene } = useScenes();
+  const [mode, setMode] = useState<Mode>("edit");
 
-  useEffect(() => {
-    socket = io();
-    socket.on("scene-changed", ({ sceneId }: { sceneId: string }) => {
-      const next = SCENES.find((s) => s.id === sceneId);
-      if (next) setScene(next);
-    });
-    return () => {
-      socket.disconnect();
-    };
+  const enterFullscreen = useCallback(() => {
+    document.documentElement.requestFullscreen().catch(() => {});
+    setMode("fullscreen");
   }, []);
 
-  return <VisualStage scene={scene} />;
+  const exitFullscreen = useCallback(() => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    setMode("edit");
+  }, []);
+
+  // F key toggles fullscreen, Escape exits
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "f" || e.key === "F") {
+        mode === "fullscreen" ? exitFullscreen() : enterFullscreen();
+      }
+    };
+    // Sync mode when user presses native Escape to exit fullscreen
+    const onFsChange = () => {
+      if (!document.fullscreenElement) setMode("edit");
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("fullscreenchange", onFsChange);
+    };
+  }, [mode, enterFullscreen, exitFullscreen]);
+
+  return (
+    <>
+      <VisualStage scene={scene} />
+      {mode === "edit" && (
+        <ControlPanel
+          activeScene={scene}
+          onSwitch={switchScene}
+          onFullscreen={enterFullscreen}
+        />
+      )}
+    </>
+  );
 }

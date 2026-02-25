@@ -1,28 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { io, Socket } from "socket.io-client";
+import { useScenes } from "@/components/remote/useScenes";
 import { SCENES } from "@/components/visuals/scenes";
 
-let socket: Socket;
-
 export default function RemotePage() {
-  const [activeId, setActiveId] = useState(SCENES[0].id);
-
-  useEffect(() => {
-    socket = io();
-    socket.on("scene-changed", ({ sceneId }: { sceneId: string }) => {
-      setActiveId(sceneId);
-    });
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
-
-  const switchScene = (sceneId: string) => {
-    setActiveId(sceneId);
-    socket.emit("switch-scene", { sceneId });
-  };
+  const { scene, switchScene } = useScenes();
 
   return (
     <div
@@ -42,12 +24,12 @@ export default function RemotePage() {
         DJ VISUALS REMOTE
       </p>
 
-      {SCENES.map((scene) => {
-        const isActive = scene.id === activeId;
+      {SCENES.map((s) => {
+        const isActive = s.id === scene.id;
         return (
           <button
-            key={scene.id}
-            onClick={() => switchScene(scene.id)}
+            key={s.id}
+            onClick={() => switchScene(s.id)}
             style={{
               width: "100%",
               maxWidth: "320px",
@@ -63,7 +45,7 @@ export default function RemotePage() {
               transition: "all 0.15s ease",
             }}
           >
-            {scene.label}
+            {s.label}
           </button>
         );
       })}
