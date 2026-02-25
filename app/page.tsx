@@ -61,7 +61,9 @@ export default function DisplayPage() {
 
   return (
     <>
-      <VisualStage scene={scene} params={activeParams} />
+      <div style={{ width: "100vw", height: "100vh" }}>
+        <VisualStage scene={scene} params={activeParams} />
+      </div>
       {mode === "edit" && (
         <ControlPanel
           activeScene={scene}

@@ -36,7 +36,7 @@ function Background({ id, params }: { id: Scene["background"]; params: Backgroun
 
 export default function VisualStage({ scene, params }: VisualStageProps) {
   return (
-    <div style={{ position: "relative", width: "100vw", height: "100vh", background: "#000", overflow: "hidden" }}>
+    <div style={{ position: "relative", width: "100%", height: "100%", background: "#000", overflow: "hidden" }}>
       <Background id={scene.background} params={params} />
       {scene.splineUrl && (
         <Spline
