@@ -597,10 +597,17 @@ export default function BuilderPage() {
   const [layerFades, setLayerFades] = useState<LayerFadeMap>({});
   const fadeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
+  const [showHUD, setShowHUD] = useState(true);
+
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const advanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const modeRef = useRef<Mode>("idle");
+  const startRecordingRef = useRef<() => void>(() => {});
+
+  // Keep modeRef in sync so keyboard handler never has stale closure
+  useEffect(() => { modeRef.current = mode; }, [mode]);
 
   const activeClip = clips[activeIndex] ?? clips[0];
   const totalDuration = clips.reduce((s, c) => s + c.duration, 0);
@@ -754,17 +761,43 @@ export default function BuilderPage() {
   const startPreview = () => { setActiveIndex(0); setMode("previewing"); playFrom(0, false); };
   const stopPreview = () => { stopAll(); setMode("idle"); setActiveIndex(0); };
 
+  // ── Keyboard shortcuts (works from anywhere, including fullscreen overlay) ──
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Ignore when typing in an input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      const key = e.key.toLowerCase();
+      if (key === "h") {
+        setShowHUD((v) => !v);
+      } else if (key === "r") {
+        const m = modeRef.current;
+        if (m === "idle" || m === "done") startRecordingRef.current();
+        else if (m === "previewing") { stopAll(); setMode("idle"); setActiveIndex(0); startRecordingRef.current(); }
+        else if (m === "recording") stopRecording();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Recording ─────────────────────────────────────────────────────────────
 
   const startRecording = async () => {
     setError(null); chunksRef.current = []; setRecordedUrl(null); setRecordedSize(0); setElapsed(0);
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 60 } as MediaTrackConstraints, audio: false });
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: "browser", frameRate: 60, width: { ideal: 3840 }, height: { ideal: 2160 } } as MediaTrackConstraints,
+        audio: false,
+        // Chrome 107+: auto-selects current tab, no picker dialog
+        preferCurrentTab: true,
+        selfBrowserSurface: "include",
+      } as DisplayMediaStreamOptions);
     } catch { setError("Screen sharing was cancelled or denied."); return; }
 
     const mimeType = ["video/webm;codecs=vp9", "video/webm"].find((t) => MediaRecorder.isTypeSupported(t)) ?? "video/webm";
-    const recorder = new MediaRecorder(stream, { mimeType });
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 20_000_000 });
     recorderRef.current = recorder;
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
     recorder.onstop = () => {
@@ -783,6 +816,7 @@ export default function BuilderPage() {
   };
 
   const stopRecording = () => { stopAll(); recorderRef.current?.stop(); };
+  startRecordingRef.current = startRecording;
   const download = () => {
     if (!recordedUrl) return;
     const a = document.createElement("a");
@@ -880,21 +914,38 @@ export default function BuilderPage() {
           <div style={{ width: "100vw", height: "100vh" }}>
             <VisualStage layers={activeClip.layers} reversed={activeClip.reversed} layerFades={layerFades} />
           </div>
-          <div style={{ position: "absolute", top: 20, right: 20, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px", fontFamily: "monospace" }}>
-            {mode === "recording" && (
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(0,0,0,0.7)", padding: "6px 12px", borderRadius: "6px", border: "1px solid #ff2222" }}>
-                <span style={{ color: "#ff2222", fontSize: "10px" }}>●</span>
-                <span style={{ color: "#fff", fontSize: "12px" }}>REC {fmt(elapsed)} / {fmt(totalDuration)}</span>
+          {showHUD && (
+            <div style={{ position: "absolute", top: 20, right: 20, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px", fontFamily: "monospace" }}>
+              {mode === "recording" && (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(0,0,0,0.7)", padding: "6px 12px", borderRadius: "6px", border: "1px solid #ff2222" }}>
+                  <span style={{ color: "#ff2222", fontSize: "10px" }}>●</span>
+                  <span style={{ color: "#fff", fontSize: "12px" }}>REC {fmt(elapsed)} / {fmt(totalDuration)}</span>
+                </div>
+              )}
+              <div style={{ background: "rgba(0,0,0,0.7)", padding: "4px 10px", borderRadius: "6px", color: "#666", fontSize: "11px", border: "1px solid #222" }}>
+                Clip {activeIndex + 1}/{clips.length} · {activeClip.layers.length} layer{activeClip.layers.length !== 1 ? "s" : ""}
               </div>
-            )}
-            <div style={{ background: "rgba(0,0,0,0.7)", padding: "4px 10px", borderRadius: "6px", color: "#666", fontSize: "11px", border: "1px solid #222" }}>
-              Clip {activeIndex + 1}/{clips.length} · {activeClip.layers.length} layer{activeClip.layers.length !== 1 ? "s" : ""}
+              {mode === "previewing" && (
+                <button
+                  onClick={startRecording}
+                  style={{ background: "#ff2222", border: "none", borderRadius: "6px", color: "#fff", cursor: "pointer", fontSize: "12px", fontFamily: "monospace", padding: "8px 16px" }}
+                >● Start Recording</button>
+              )}
+              <button
+                onClick={mode === "recording" ? stopRecording : stopPreview}
+                style={{ background: "#333", border: "none", borderRadius: "6px", color: "#aaa", cursor: "pointer", fontSize: "12px", fontFamily: "monospace", padding: "8px 16px" }}
+              >{mode === "recording" ? "■ Stop" : "✕ Exit"}</button>
+              <div style={{ color: "#333", fontSize: "10px", textAlign: "right", lineHeight: "1.8" }}>
+                R — {mode === "recording" ? "stop rec" : "start rec"} · H — hide UI
+              </div>
             </div>
-            <button
-              onClick={mode === "recording" ? stopRecording : stopPreview}
-              style={{ background: mode === "recording" ? "#ff2222" : "#333", border: "none", borderRadius: "6px", color: "#fff", cursor: "pointer", fontSize: "12px", fontFamily: "monospace", padding: "8px 16px" }}
-            >{mode === "recording" ? "Stop Recording" : "Stop Preview"}</button>
-          </div>
+          )}
+          {!showHUD && (
+            <div
+              style={{ position: "absolute", bottom: 16, right: 16, color: "rgba(255,255,255,0.15)", fontSize: "10px", fontFamily: "monospace", cursor: "default" }}
+              title="H to show controls"
+            >H</div>
+          )}
         </div>
       )}
 
@@ -1002,8 +1053,9 @@ export default function BuilderPage() {
                     <Row label="Clips"      value={String(clips.length)} />
                     <Row label="Layers"     value={String(clips.reduce((s, c) => s + c.layers.length, 0))} />
                     <Row label="Duration"   value={fmt(totalDuration)} />
-                    <Row label="Format"     value="WebM" />
+                    <Row label="Format"     value="WebM · 20 Mbps" />
                     <Row label="Frame rate" value="60fps" />
+                    <Row label="Resolution" value="up to 4K" />
                   </div>
 
                   {(mode === "idle" || mode === "done") && (
@@ -1032,7 +1084,7 @@ export default function BuilderPage() {
                   {error && <span style={{ color: "#ff4444", fontSize: "11px" }}>{error}</span>}
                   {mode === "idle" && (
                     <div style={{ marginTop: "auto", padding: "12px", background: "#0a0a0a", border: "1px solid #141414", borderRadius: "8px", color: "#333", fontSize: "10px", lineHeight: "1.6" }}>
-                      When you click Record, your browser will ask which tab to share. Select this tab, then the visuals will play through automatically.
+                      On Chrome, recording starts immediately — no screen picker. On other browsers, select this tab when prompted. Maximize this window before recording for the highest resolution output.
                     </div>
                   )}
                 </div>
