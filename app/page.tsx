@@ -5,7 +5,7 @@ import VisualStage from "@/components/visuals/VisualStage";
 import ControlPanel from "@/components/remote/ControlPanel";
 import { useScenes } from "@/components/remote/useScenes";
 import {
-  BackgroundParams, DEFAULT_PARAMS, BackgroundId,
+  BackgroundParams, DEFAULT_PARAMS, BackgroundId, Layer,
 } from "@/components/visuals/scenes";
 
 type Mode = "edit" | "fullscreen";
@@ -24,9 +24,9 @@ export default function DisplayPage() {
   const handleParamChange = useCallback((key: string, value: number | string | [number, number, number]) => {
     setParamsMap((prev) => {
       const current = prev[scene.background];
-      // Aurora colorStops come as comma-joined string from ControlPanel — split back to array
-      if (key === "colorStops" && typeof value === "string") {
-        return { ...prev, [scene.background]: { ...current, colorStops: value.split(",") } };
+      // Array params come as comma-joined strings from ControlPanel — split back to arrays
+      if ((key === "colorStops" || key === "texts" || key === "words") && typeof value === "string") {
+        return { ...prev, [scene.background]: { ...current, [key]: value.split(",") } };
       }
       return { ...prev, [scene.background]: { ...current, [key]: value } };
     });
@@ -59,10 +59,32 @@ export default function DisplayPage() {
     };
   }, [mode, enterFullscreen, exitFullscreen]);
 
+  // Convert scene + params → layers for VisualStage
+  const layers: Layer[] = [
+    {
+      id: "display-bg",
+      type: "background",
+      backgroundId: scene.background,
+      params: activeParams,
+      opacity: 1,
+      blendMode: "normal",
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+    ...(scene.splineUrl ? [{
+      id: "display-spline",
+      type: "spline" as const,
+      splineUrl: scene.splineUrl,
+      opacity: 1,
+      fadeIn: 0,
+      fadeOut: 0,
+    }] : []),
+  ];
+
   return (
     <>
       <div style={{ width: "100vw", height: "100vh" }}>
-        <VisualStage scene={scene} params={activeParams} />
+        <VisualStage layers={layers} />
       </div>
       {mode === "edit" && (
         <ControlPanel
